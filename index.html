@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Forecast your solo Monster Den clear rate in Puzzles & Chaos with a calibrated combat model based on troop tier, type, and stats.">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#080b11">
+    <title>Monster Den Predictor | Puzzles &amp; Chaos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-background" aria-hidden="true"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-badge">P&amp;C Utility Engine v1.5</div>
+                <h1 class="app-title">Monster Den Predictor</h1>
+                <p class="app-subtitle">Calibrated combat cleared-percentage forecasting</p>
+            </div>
+            <div class="header-meta">
+                <span class="version-chip font-mono">MODEL v2.1 • PROFILE OCR</span>
+                <button id="adminToggleBtn" class="admin-btn" type="button" aria-controls="adminPanel" aria-expanded="false">
+                    <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Admin</span>
+                </button>
+            </div>
+        </header>
+
+        <noscript>
+            <p class="app-subtitle">JavaScript is required to calculate predictions.</p>
+        </noscript>
+
+        <main class="dashboard-grid">
+            <!-- Input Parameters Section -->
+            <section class="card panel-input">
+                <div class="card-header">
+                    <div class="card-icon" aria-hidden="true">⚡</div>
+                    <div>
+                        <h2 class="card-title">March &amp; Profile Parameters</h2>
+                        <p class="card-desc">Separated inputs for general &amp; specific troop bonuses</p>
+                    </div>
+                </div>
+
+                <div class="import-panel" aria-labelledby="importTitle">
+                    <div class="import-head">
+                        <div>
+                            <h3 id="importTitle" class="import-title">Profile Screenshot Import</h3>
+                            <p class="import-desc">Drop a screenshot of your stat page. Recognition runs in this browser and the image is never uploaded.</p>
+                        </div>
+                        <span class="import-badge">Local OCR</span>
+                    </div>
+
+                    <input id="screenshotInput" type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif" hidden>
+
+                    <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-describedby="dropzoneHint" aria-controls="screenshotInput">
+                        <span class="dropzone-icon" aria-hidden="true">🖼️</span>
+                        <span class="dropzone-copy">
+                            <span class="dropzone-main">Drop a screenshot, paste it, or <span class="dropzone-link">choose a file</span></span>
+                            <span id="dropzoneHint" class="dropzone-hint">General and type stats · PNG, JPG, WebP · first run downloads the OCR engine</span>
+                        </span>
+                    </div>
+
+                    <div id="importProgress" class="import-progress hidden" role="status">
+                        <div id="importProgressTrack" class="progress-track" role="progressbar" aria-label="Screenshot import progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <div id="importProgressBar" class="progress-bar"></div>
+                        </div>
+                        <div class="import-progress-row">
+                            <span id="importStatus">Preparing…</span>
+                            <button id="importCancelBtn" class="btn-text hidden" type="button">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div id="importPreviewWrap" class="import-preview hidden">
+                        <img id="importPreview" class="import-preview-img" alt="">
+                        <div class="import-preview-meta">
+                            <span id="importFileName" class="import-file-name"></span>
+                            <button id="importClearBtn" class="btn-text" type="button">Remove</button>
+                        </div>
+                    </div>
+
+                    <p id="importError" class="import-error hidden" role="alert"></p>
+                    <p id="importNote" class="import-note hidden" role="status"></p>
+                </div>
+
+                <div class="form-grid">
+                    <!-- March Basics -->
+                    <div class="form-group full-width">
+                        <label class="form-label" for="troopCount">Troop Count</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="troopCount" name="troopCount" value="150000" min="1" step="1" inputmode="numeric" autocomplete="off" class="form-input">
+                            <span class="input-suffix">Units</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="troopTier">Troop Tier</label>
+                        <select id="troopTier" name="troopTier" class="form-select">
+                            <option value="T5">T5 (Standard)</option>
+                            <option value="T6">T6 (Heavy)</option>
+                            <option value="T7">T7 (Elite)</option>
+                            <option value="T8" selected>T8 (Master)</option>
+                            <option value="T9">T9 (Grandmaster)</option>
+                            <option value="T10">T10 (Epic)</option>
+                            <option value="T11">T11 (Legendary)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="troopType">Troop Type</label>
+                        <select id="troopType" name="troopType" class="form-select">
+                            <option value="Infantry">🛡️ Infantry</option>
+                            <option value="Cavalry">🏇 Cavalry</option>
+                            <option value="Archer" selected>🏹 Archer</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label" for="denLevel">Target Den Level</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="denLevel" name="denLevel" value="26" min="1" max="45" step="1" inputmode="numeric" autocomplete="off" aria-describedby="denLevelHint" class="form-input font-bold">
+                            <span id="denLevelHint" class="input-suffix">Lvl 1-45</span>
+                        </div>
+                    </div>
+
+                    <!-- General Troop Stats Section -->
+                    <div class="section-divider full-width">
+                        <h3 class="divider-title">1. General Troop Stats</h3>
+                    </div>
+
+                    <div class="form-group-triple full-width">
+                        <div class="stat-input-card">
+                            <label class="stat-label" for="genAtk">Troop ATK</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="genAtk" name="genAtk" value="148.4" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                        <div class="stat-input-card">
+                            <label class="stat-label" for="genDef">Troop DEF</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="genDef" name="genDef" value="216.2" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                        <div class="stat-input-card">
+                            <label class="stat-label" for="genHp">Troop HP</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="genHp" name="genHp" value="188.0" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label" for="genDmg">General Troop Damage Up %</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="genDmg" name="genDmg" value="1.0" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input">
+                            <span class="input-suffix">%</span>
+                        </div>
+                    </div>
+
+                    <!-- Type Specific Stats Section -->
+                    <div class="section-divider full-width">
+                        <h3 class="divider-title">2. Type-Specific Stats (INF/CAV/Ranged)</h3>
+                    </div>
+
+                    <div class="form-group-triple full-width">
+                        <div class="stat-input-card accent-border">
+                            <label class="stat-label accent-text" for="typeAtk">Type ATK</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="typeAtk" name="typeAtk" value="400.1" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                        <div class="stat-input-card accent-border">
+                            <label class="stat-label accent-text" for="typeDef">Type DEF</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="typeDef" name="typeDef" value="465.1" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                        <div class="stat-input-card accent-border">
+                            <label class="stat-label accent-text" for="typeHp">Type HP</label>
+                            <div class="input-wrapper-sm">
+                                <input type="number" id="typeHp" name="typeHp" value="503.4" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input-sm">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label" for="typeDmg">Type-Specific Damage Up %</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="typeDmg" name="typeDmg" value="0.5" min="0" step="0.1" inputmode="decimal" autocomplete="off" class="form-input">
+                            <span class="input-suffix">%</span>
+                        </div>
+                    </div>
+
+                    <!-- Computed Totals Bar (Auto-Summed) -->
+                    <div class="totals-summary-bar full-width">
+                        <div class="totals-header">AUTO-COMBINED TOTALS</div>
+                        <div class="totals-grid">
+                            <div class="total-item">
+                                <span class="total-label">Net ATK</span>
+                                <output id="totalAtkSummary" class="total-val font-mono" for="genAtk typeAtk" aria-live="off">548.5%</output>
+                            </div>
+                            <div class="total-item">
+                                <span class="total-label">Net DEF</span>
+                                <output id="totalDefSummary" class="total-val font-mono" for="genDef typeDef" aria-live="off">681.3%</output>
+                            </div>
+                            <div class="total-item">
+                                <span class="total-label">Net HP</span>
+                                <output id="totalHpSummary" class="total-val font-mono" for="genHp typeHp" aria-live="off">691.4%</output>
+                            </div>
+                            <div class="total-item">
+                                <span class="total-label">Net Damage</span>
+                                <output id="totalDmgSummary" class="total-val font-mono" for="genDmg typeDmg" aria-live="off">1.5%</output>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Results + Improvement Plan Column -->
+            <div class="output-stack">
+                <!-- Results Section -->
+                <section class="card panel-output">
+                    <div>
+                        <div class="card-header">
+                            <div class="card-icon glow-blue" aria-hidden="true">🎯</div>
+                            <div>
+                                <h2 class="card-title">Forecast Output</h2>
+                                <p class="card-desc">Real-time prediction outcome</p>
+                            </div>
+                        </div>
+
+                        <div class="prediction-display-card">
+                            <div class="prediction-meta">
+                                <span class="prediction-caption">ESTIMATED CLEAR RATE</span>
+                                <span class="confidence-tag">±5% Margin</span>
+                            </div>
+                            <div id="predKill" class="prediction-value font-mono">0.00%</div>
+
+                            <div id="clearResult" class="status-pill result-fail" role="status" aria-live="polite" aria-atomic="true">
+                                <span class="status-indicator" aria-hidden="true"></span>
+                                <span class="status-text">DEFEAT EXPECTED</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin panel (hidden by default; client-side gate only, not a security boundary) -->
+                    <div id="adminPanel" class="admin-panel hidden" role="region" aria-labelledby="adminPanelTitle">
+                        <h3 id="adminPanelTitle" class="admin-badge"><span aria-hidden="true">🔒</span> Engine Diagnostics &amp; Telemetry</h3>
+
+                        <div class="diag-grid">
+                            <div class="diag-card">
+                                <span class="diag-label">March Power Score</span>
+                                <span id="marchPower" class="diag-value font-mono">0.00</span>
+                            </div>
+                            <div class="diag-card">
+                                <span class="diag-label">Static Den Power</span>
+                                <span id="enemyPower" class="diag-value font-mono">0.00</span>
+                            </div>
+                            <div class="diag-card full">
+                                <span class="diag-label">Power Ratio (March / Den)</span>
+                                <span id="powerRatio" class="diag-value font-mono accent">0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="log-box">
+                            <label class="form-label" for="actualKillInput">Train Model (Log Observed Battle Result)</label>
+                            <div class="log-controls">
+                                <input type="number" id="actualKillInput" name="actualKillInput" placeholder="Actual Kill %" min="0.01" max="100" step="0.01" inputmode="decimal" autocomplete="off" title="Enter 0–100. Values below 1 are treated as fractions (0.5 = 50%)." class="form-input">
+                                <button id="logBtn" class="btn-primary-sm" type="button">Log Battle</button>
+                            </div>
+                            <div class="log-footer">
+                                <span id="logCount">Logs: 0 (C=59.89)</span>
+                                <button id="resetLogsBtn" class="btn-reset" type="button">Reset Model</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="suggestionsCard" class="card suggestions-card" data-target="55" aria-labelledby="suggestionsTitle" hidden>
+                    <div class="card-header">
+                        <div class="card-icon glow-amber" aria-hidden="true">📈</div>
+                        <div>
+                            <h2 id="suggestionsTitle" class="card-title">Improvement Plan</h2>
+                            <p id="suggestionsIntro" class="card-desc">Adjust inputs to see what closes the gap to the 55% planning target.</p>
+                        </div>
+                    </div>
+                    <div id="suggestionsBody" class="suggestions-body"></div>
+                    <p class="suggestions-footnote">The planning target is 55% — 50% clear plus the model's ±5% margin. Suggestions are model estimates, not guarantees.</p>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <dialog id="reviewDialog" class="review-dialog" aria-labelledby="reviewTitle" aria-describedby="reviewDesc">
+        <div class="review-form">
+            <header class="review-header">
+                <div>
+                    <h2 id="reviewTitle" class="review-title">Review Imported Stats</h2>
+                    <p id="reviewDesc" class="review-desc">Check every value against the screenshot before applying it. All values are percentages; blank fields are left unchanged.</p>
+                </div>
+                <button type="button" class="review-close" data-review-close aria-label="Close review dialog">×</button>
+            </header>
+
+            <div class="review-body">
+                <section class="review-group" aria-labelledby="reviewGeneralTitle">
+                    <div class="review-group-head">
+                        <h3 id="reviewGeneralTitle" class="review-group-title">General Troop Stats</h3>
+                        <span class="review-group-note">Applies to the general fields</span>
+                    </div>
+                    <div class="review-grid">
+                        <label class="review-field" for="reviewGenAtk">
+                            <span class="review-label">ATK</span>
+                            <input id="reviewGenAtk" data-scope="general" data-stat="atk" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewGenDef">
+                            <span class="review-label">DEF</span>
+                            <input id="reviewGenDef" data-scope="general" data-stat="def" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewGenHp">
+                            <span class="review-label">HP</span>
+                            <input id="reviewGenHp" data-scope="general" data-stat="hp" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewGenDmg">
+                            <span class="review-label">DMG</span>
+                            <input id="reviewGenDmg" data-scope="general" data-stat="dmg" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="review-group" aria-labelledby="reviewTypeTitle">
+                    <div class="review-group-head">
+                        <h3 id="reviewTypeTitle" class="review-group-title">Type-Specific Stats</h3>
+                        <span class="review-group-note">Applies to the selected troop type</span>
+                    </div>
+                    <div id="reviewTypeTabs" class="type-tabs" role="group" aria-label="Choose which type-specific stats to apply">
+                        <button type="button" class="type-tab" data-type="Infantry" aria-pressed="false">Infantry <span class="tab-count">0/4</span></button>
+                        <button type="button" class="type-tab" data-type="Cavalry" aria-pressed="false">Cavalry <span class="tab-count">0/4</span></button>
+                        <button type="button" class="type-tab" data-type="Archer" aria-pressed="false">Archer <span class="tab-count">0/4</span></button>
+                    </div>
+                    <div class="review-grid">
+                        <label class="review-field" for="reviewTypeAtk">
+                            <span class="review-label">ATK</span>
+                            <input id="reviewTypeAtk" data-scope="type" data-stat="atk" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewTypeDef">
+                            <span class="review-label">DEF</span>
+                            <input id="reviewTypeDef" data-scope="type" data-stat="def" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewTypeHp">
+                            <span class="review-label">HP</span>
+                            <input id="reviewTypeHp" data-scope="type" data-stat="hp" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                        <label class="review-field" for="reviewTypeDmg">
+                            <span class="review-label">DMG</span>
+                            <input id="reviewTypeDmg" data-scope="type" data-stat="dmg" type="number" min="0" step="0.1" inputmode="decimal" autocomplete="off" placeholder="—">
+                            <span class="confidence-pill" data-level="missing">—</span>
+                        </label>
+                    </div>
+                </section>
+
+                <details class="review-raw">
+                    <summary>OCR raw text</summary>
+                    <pre id="reviewRaw"></pre>
+                </details>
+            </div>
+
+            <footer class="review-footer">
+                <p id="reviewSummary" class="review-summary">0/4 general · 0/4 Infantry selected</p>
+                <div class="review-actions">
+                    <button type="button" class="btn-secondary" data-review-close>Cancel</button>
+                    <button type="button" id="reviewApply" class="btn-primary">Apply to calculator</button>
+                </div>
+            </footer>
+        </div>
+    </dialog>
+
+    <script src="engine.js"></script>
+    <script src="profile-parser.js"></script>
+    <script src="suggestions.js"></script>
+    <script src="screenshot.js"></script>
+</body>
+</html>
