@@ -1,8 +1,9 @@
 // Shared calibration for Monster Den Predictor.
-// This file is replaced when a maintainer publishes new battle data.
+// Generated from 7 local battle logs on 2026-11-10T22:26:32.558Z.
+// Replace calibration.js in the site folder with this file, then commit it to GitHub.
 window.PNC_CALIBRATION = {
     model: "2.1",
-    coefficient: 59.8861,
-    sampleSize: 0,
-    updatedAt: null
+    coefficient: 56.859,
+    sampleSize: 7,
+    updatedAt: "2026-11-10T22:26:32.558Z"
 };
