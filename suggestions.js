@@ -7,6 +7,9 @@
     const EXPONENT = 0.1676;
     const TIER_ORDER = ['T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11'];
     const TYPE_ORDER = ['Infantry', 'Cavalry', 'Archer'];
+    const MAX_STAT_MULTIPLIER = 6;        // total ATK+DEF+HP; above this is too unrealistic
+    const LONG_TERM_STAT_MULTIPLIER = 3;  // above this, label the stat target as long-term
+    const MAX_DAMAGE_GAIN = 25;           // percentage points; Damage Up is a scarce stat
 
     function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -183,17 +186,20 @@
         if (!(perStat > 0)) return null;
 
         const achievedSum = state.statSum + perStat * 3;
-        // Skip stat targets that require tripling the current total or more.
-        if (achievedSum > state.statSum * 3) return null;
+        // Skip stat targets that would need more than a sixfold total increase.
+        if (achievedSum > state.statSum * MAX_STAT_MULTIPLIER) return null;
+
+        const longTerm = achievedSum > state.statSum * LONG_TERM_STAT_MULTIPLIER;
         const projected = predict(state, state.marchPower * Math.sqrt(achievedSum / state.statSum), state.enemyPower);
 
         return {
             key: 'stats',
             priority: 4,
-            tag: 'Stat growth',
-            title: `Gain about +${perStat.toFixed(1)}% in each troop stat`,
-            detail: `Total ATK+DEF+HP needs to reach ${achievedSum.toFixed(1)}% (currently ${state.statSum.toFixed(1)}%). Spread evenly, that is roughly +${perStat.toFixed(1)}% each in ATK, DEF, and HP.`,
-            projected
+            tag: longTerm ? 'Long-term stat growth' : 'Stat growth',
+            title: `Add about +${perStat.toFixed(1)} pts to each troop stat`,
+            detail: `Total ATK+DEF+HP needs to reach ${achievedSum.toFixed(1)} (currently ${state.statSum.toFixed(1)}). Spread evenly, that is roughly +${perStat.toFixed(1)} pts each in ATK, DEF, and HP.`,
+            projected,
+            longTerm
         };
     }
 
@@ -201,9 +207,10 @@
         if (!(multiplier > 1) || !Number.isFinite(multiplier)) return null;
 
         const required = ceilTo(100 * (multiplier * (1 + state.netDmg / 100) - 1), 0.1);
-        if (!(required > state.netDmg + 0.05)) return null;
-        // Keep damage targets in a range that can plausibly be reached in-game.
-        if (required > 300) return null;
+        const gain = required - state.netDmg;
+        if (!(gain > 0.05)) return null;
+        // Damage Up is scarce; do not present a +100-point jump as a practical fix.
+        if (gain > MAX_DAMAGE_GAIN) return null;
 
         const projected = predict(
             state,
@@ -265,6 +272,7 @@
         ]
             .filter(Boolean)
             .sort((a, b) => a.priority - b.priority);
+        result.hasGrowthSuggestion = result.suggestions.some(item => item.key === 'stats' || item.key === 'damage');
 
         return result;
     }
@@ -366,6 +374,12 @@
         const grid = element('div', 'suggestion-grid');
         analysis.suggestions.forEach(item => grid.append(suggestionCard(item)));
         body.append(grid);
+
+        if (analysis.suggestions.some(item => item.longTerm)) {
+            body.append(element('p', 'suggestions-note', 'Long-term targets are shown for direction, not as quick single-step upgrades.'));
+        } else if (!analysis.hasGrowthSuggestion) {
+            body.append(element('p', 'suggestions-note', 'No practical single-step stat or damage increase is listed for this gap.'));
+        }
     }
 
     function mount() {

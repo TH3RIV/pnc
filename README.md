@@ -31,6 +31,17 @@ python -m http.server 8000
 
 Then open <http://localhost:8000>. The folder can also be published as a static site on GitHub Pages.
 
+## Publishing a new calibration
+
+Battle logs stay in your browser. To share an improved model:
+
+1. Open **Admin** (PIN `7777`) and log a few real battle results.
+2. Click **Download calibration.js** in the Shared Calibration panel.
+3. Replace `calibration.js` in this folder with the downloaded file.
+4. Commit and push. GitHub Pages serves the new calibration to every visitor.
+
+The file stores the average coefficient and the number of battles used. Visitors with their own logs keep using their local average; everyone else gets the published value. **Backup logs** downloads a JSON copy of the logs in this browser. If an old value still appears after publishing, wait for the GitHub Pages cache or hard-refresh the page.
+
 ## Notes
 
 - The first screenshot import downloads the OCR engine, so it needs an internet connection. Later imports use the browser cache.

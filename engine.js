@@ -14,14 +14,19 @@ const denPowerTable = {
 const tierMods = { "T5": 0.75, "T6": 0.85, "T7": 0.95, "T8": 1.0, "T9": 1.15, "T10": 1.3, "T11": 1.45 };
 const typeMods = { "Infantry": 1.0, "Cavalry": 1.1, "Archer": 1.05, "Mixed Squad": 0.95 };
 
+const MODEL_VERSION = "2.1";
+const MODEL_EXPONENT = 0.1676;
+const BASELINE_C = 59.8861;
+
 // Expose the model constants to the optional v1.5 modules as a read-only snapshot.
 if (typeof window !== 'undefined') {
     window.PNCEngine = Object.freeze({
         denPowerTable,
         tierMods,
         typeMods,
-        exponent: 0.1676,
-        baselineC: 59.8861
+        model: MODEL_VERSION,
+        exponent: MODEL_EXPONENT,
+        baselineC: BASELINE_C
     });
 }
 
@@ -39,6 +44,113 @@ function getLogs() {
     } catch {
         return [];
     }
+}
+
+// Published calibration comes from calibration.js, which is loaded before this file.
+function getPublishedCalibration() {
+    const raw = typeof window !== 'undefined' ? window.PNC_CALIBRATION : null;
+    const coefficient = raw ? Number(raw.coefficient) : NaN;
+
+    if (!raw || !Number.isFinite(coefficient) || coefficient <= 0) {
+        return {
+            model: MODEL_VERSION,
+            coefficient: BASELINE_C,
+            sampleSize: 0,
+            updatedAt: null,
+            valid: false
+        };
+    }
+
+    const sampleSize = Number(raw.sampleSize);
+    return {
+        model: typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : MODEL_VERSION,
+        coefficient,
+        sampleSize: Number.isFinite(sampleSize) && sampleSize > 0 ? Math.floor(sampleSize) : 0,
+        updatedAt: typeof raw.updatedAt === 'string' && raw.updatedAt.trim() ? raw.updatedAt.trim() : null,
+        valid: true
+    };
+}
+
+function coefficientForLogs(logs) {
+    if (!Array.isArray(logs) || logs.length === 0) return null;
+
+    const sumC = logs.reduce((sum, log) => {
+        return sum + (log.actual / Math.pow(log.ratio, MODEL_EXPONENT));
+    }, 0);
+    const average = sumC / logs.length;
+
+    return Number.isFinite(average) && average > 0 ? average : null;
+}
+
+function getModelState() {
+    const published = getPublishedCalibration();
+    const logs = getLogs();
+    const localCoefficient = coefficientForLogs(logs);
+    const usingLocal = localCoefficient !== null;
+
+    let source = 'baseline';
+    if (usingLocal) source = 'local';
+    else if (published.valid && published.sampleSize > 0) source = 'published';
+
+    return {
+        published,
+        logs,
+        localCoefficient,
+        usingLocal,
+        coefficient: usingLocal ? localCoefficient : published.coefficient,
+        source,
+        sampleSize: usingLocal ? logs.length : published.sampleSize
+    };
+}
+
+function formatSampleSize(count) {
+    return `${count} ${count === 1 ? 'sample' : 'samples'}`;
+}
+
+function formatCalibrationDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0, 10);
+}
+
+function setText(id, text) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = text;
+}
+
+function updateCalibrationUI(state) {
+    const source = document.getElementById('calibrationSource');
+    if (source) {
+        const labels = {
+            local: 'LOCAL OVERRIDE',
+            published: 'PUBLISHED',
+            baseline: 'BASELINE'
+        };
+        source.textContent = labels[state.source];
+        source.className = `calibration-pill ${state.source}`;
+        source.title = state.source === 'local'
+            ? 'Your local battle logs override the published calibration.'
+            : state.source === 'published'
+                ? 'Using the calibration published with the site.'
+                : 'Using the built-in baseline coefficient.';
+    }
+
+    let publishedText;
+    if (!state.published.valid) {
+        publishedText = `C ${BASELINE_C.toFixed(4)} · built-in fallback`;
+    } else {
+        publishedText = `C ${state.published.coefficient.toFixed(4)} · ${formatSampleSize(state.published.sampleSize)}`;
+        if (state.published.updatedAt) {
+            publishedText += ` · ${formatCalibrationDate(state.published.updatedAt)}`;
+        }
+    }
+    setText('publishedCalibration', publishedText);
+
+    setText('localCalibration', state.usingLocal
+        ? `C ${state.localCoefficient.toFixed(4)} · ${state.logs.length} ${state.logs.length === 1 ? 'log' : 'logs'}`
+        : 'No local logs');
+
+    setText('logCount', `Logs: ${state.logs.length} (C=${state.coefficient.toFixed(2)})`);
 }
 
 function readNonNegative(id) {
@@ -84,16 +196,10 @@ function calculate() {
     const enemyPower = rawDenPwr / 1000000;
     const powerRatio = enemyPower > 0 ? marchPower / enemyPower : 0;
 
-    let cAvg = 59.8861; // Calibrated baseline coefficient
-    const logs = getLogs();
-    if (logs.length > 0) {
-        const sumC = logs.reduce((sum, log) => {
-            return sum + (log.actual / Math.pow(log.ratio, 0.1676));
-        }, 0);
-        cAvg = sumC / logs.length;
-    }
+    const modelState = getModelState();
+    const cAvg = modelState.coefficient;
 
-    const predKill = Math.max(0, Math.min(100, cAvg * Math.pow(powerRatio, 0.1676)));
+    const predKill = Math.max(0, Math.min(100, cAvg * Math.pow(powerRatio, MODEL_EXPONENT)));
 
     // Update Telemetry
     document.getElementById('marchPower').textContent = marchPower.toFixed(4);
@@ -113,7 +219,7 @@ function calculate() {
     resEl.classList.toggle('result-pass', isClear);
     resEl.classList.toggle('result-fail', !isClear);
 
-    document.getElementById('logCount').textContent = `Logs: ${logs.length} (C=${cAvg.toFixed(2)})`;
+    updateCalibrationUI(modelState);
 
     // Let optional modules (improvement suggestions, screenshot import) react to the latest model state.
     document.dispatchEvent(new CustomEvent('pnc:calculation', {
@@ -123,7 +229,14 @@ function calculate() {
             typeAtk, typeDef, typeHp, typeDmg,
             netAtk, netDef, netHp, netDmg,
             statSum, marchPower, enemyPower, powerRatio,
-            cAvg, predKill, isClear
+            cAvg, predKill, isClear,
+            calibration: {
+                source: modelState.source,
+                coefficient: cAvg,
+                sampleSize: modelState.sampleSize,
+                publishedCoefficient: modelState.published.coefficient,
+                localCoefficient: modelState.localCoefficient
+            }
         }
     }));
 
@@ -173,6 +286,86 @@ function resetLogs() {
     }
 }
 
+function downloadFile(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Build the exact file that replaces calibration.js on the published site.
+function buildCalibrationFile() {
+    const state = getModelState();
+    if (state.localCoefficient === null) return null;
+
+    const coefficient = Math.round(state.localCoefficient * 10000) / 10000;
+    const updatedAt = new Date().toISOString();
+    const suffix = state.logs.length === 1 ? '' : 's';
+
+    return `// Shared calibration for Monster Den Predictor.
+// Generated from ${state.logs.length} local battle log${suffix} on ${updatedAt}.
+// Replace calibration.js in the site folder with this file, then commit it to GitHub.
+window.PNC_CALIBRATION = {
+    model: "${MODEL_VERSION}",
+    coefficient: ${coefficient},
+    sampleSize: ${state.logs.length},
+    updatedAt: "${updatedAt}"
+};
+`;
+}
+
+function buildBattleLogsFile() {
+    const logs = getLogs();
+    if (logs.length === 0) return null;
+
+    const coefficient = coefficientForLogs(logs);
+    return JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        model: MODEL_VERSION,
+        exponent: MODEL_EXPONENT,
+        coefficient: coefficient === null ? null : Math.round(coefficient * 10000) / 10000,
+        logs
+    }, null, 2) + '\n';
+}
+
+function exportCalibration() {
+    const content = buildCalibrationFile();
+    if (!content) {
+        alert("Log at least one battle before exporting a calibration file.");
+        return false;
+    }
+    downloadFile('calibration.js', content, 'text/javascript');
+    return true;
+}
+
+function exportBattleLogs() {
+    const content = buildBattleLogsFile();
+    if (!content) {
+        alert("There are no battle logs to back up yet.");
+        return false;
+    }
+    downloadFile('battle-logs.json', content, 'application/json');
+    return true;
+}
+
+// Small read-only API for testing and for the admin buttons.
+if (typeof window !== 'undefined') {
+    window.PNCAdmin = Object.freeze({
+        getModelState,
+        getLogs,
+        buildCalibrationFile,
+        buildBattleLogsFile,
+        exportCalibration,
+        exportBattleLogs
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input, select').forEach(el => {
         el.addEventListener('input', calculate);
@@ -192,6 +385,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logBtn').addEventListener('click', logBattle);
     document.getElementById('resetLogsBtn').addEventListener('click', resetLogs);
+
+    const exportCalibrationBtn = document.getElementById('exportCalibrationBtn');
+    if (exportCalibrationBtn) {
+        exportCalibrationBtn.addEventListener('click', exportCalibration);
+    }
+
+    const exportLogsBtn = document.getElementById('exportLogsBtn');
+    if (exportLogsBtn) {
+        exportLogsBtn.addEventListener('click', exportBattleLogs);
+    }
 
     calculate();
 });

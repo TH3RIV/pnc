@@ -19,7 +19,7 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-brand">
-                <div class="brand-badge">P&amp;C Utility Engine v1.5</div>
+                <div class="brand-badge">P&amp;C Utility Engine v1.6</div>
                 <h1 class="app-title">Monster Den Predictor</h1>
                 <p class="app-subtitle">Calibrated combat cleared-percentage forecasting</p>
             </div>
@@ -278,6 +278,26 @@
                                 <button id="resetLogsBtn" class="btn-reset" type="button">Reset Model</button>
                             </div>
                         </div>
+
+                        <div class="calibration-box">
+                            <div class="calibration-head">
+                                <span class="calibration-title">Shared Calibration</span>
+                                <span id="calibrationSource" class="calibration-pill baseline">BASELINE</span>
+                            </div>
+                            <div class="calibration-row">
+                                <span class="calibration-label">Published file</span>
+                                <span id="publishedCalibration" class="calibration-value font-mono">C 59.8861 · 0 samples</span>
+                            </div>
+                            <div class="calibration-row">
+                                <span class="calibration-label">This browser</span>
+                                <span id="localCalibration" class="calibration-value font-mono">No local logs</span>
+                            </div>
+                            <div class="calibration-actions">
+                                <button id="exportCalibrationBtn" class="btn-secondary-sm" type="button">Download calibration.js</button>
+                                <button id="exportLogsBtn" class="btn-secondary-sm" type="button">Backup logs</button>
+                            </div>
+                            <p class="calibration-hint">Replace <code>calibration.js</code> in the site folder with the downloaded file, then commit it to GitHub.</p>
+                        </div>
                     </div>
                 </section>
 
@@ -386,6 +406,7 @@
         </div>
     </dialog>
 
+    <script src="calibration.js"></script>
     <script src="engine.js"></script>
     <script src="profile-parser.js"></script>
     <script src="suggestions.js"></script>
